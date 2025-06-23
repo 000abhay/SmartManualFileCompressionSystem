@@ -1,0 +1,1 @@
+This folder stores decompressed files which are decompressed manually.
