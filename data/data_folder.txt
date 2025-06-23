@@ -1,0 +1,2 @@
+Delete this file after downloading/cloning the repository.
+This folder is intended to compress all teh files automatically which are pasted in this folder after certain interval time.
