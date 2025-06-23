@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Smart File Compression</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <script src="/static/js/script.js" defer></script>
+</head>
+<body>
+    <nav class="navbar" aria-label="Main navigation">
+        <div class="nav-logo" tabindex="0" aria-label="Smart File Compression Home">
+            <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><rect width="28" height="28" rx="6" fill="#fff"/><rect x="4" y="4" width="20" height="20" rx="4" fill="#000"/></svg>
+            <span>Smart File Compression</span>
+        </div>
+        <ul class="nav-links" role="menubar">
+            <li><button class="nav-btn" data-page="dashboard" aria-current="page">Dashboard</button></li>
+            <li><button class="nav-btn" data-page="upload">Upload</button></li>
+            <li><button class="nav-btn" data-page="manual">Manual Actions</button></li>
+            <li><button class="nav-btn" data-page="activity">Activity Log</button></li>
+            <li><button class="nav-btn" data-page="about">About</button></li>
+        </ul>
+    </nav>
+    <main>
+        <!-- Dashboard Page -->
+        <section id="dashboard" class="page-section active" tabindex="0">
+            <h1>Dashboard</h1>
+            <div class="card-grid">
+                <div class="card">
+                    <h2>Disk Usage</h2>
+                    <pre class="mono" id="disk-usage">{{ disk_usage }}</pre>
+                </div>
+                <div class="card">
+                    <h2>Storage Metrics</h2>
+                    <ul class="metrics-list" id="storage-metrics">
+                        <li><span>Total Space</span><span>{{ storage_metrics.total_space }}</span></li>
+                        <li><span>Used Space</span><span>{{ storage_metrics.used_space }}</span></li>
+                        <li><span>Free Space</span><span>{{ storage_metrics.free_space }}</span></li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h2>Performance Metrics</h2>
+                    <ul class="metrics-list" id="performance-metrics">
+                        <li><span>Access Time Reduction</span><span>{{ performance_metrics.access_time_reduction }}%</span></li>
+                        <li><span>Space Saved</span><span>{{ performance_metrics.space_saved }}</span></li>
+                        <li><span>Total Files Compressed</span><span>{{ performance_metrics.total_files_compressed }}</span></li>
+                        <li><span>Total Files Decompressed</span><span>{{ performance_metrics.total_files_decompressed }}</span></li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+        <!-- Upload Page -->
+        <section id="upload" class="page-section" tabindex="0">
+            <h1>Upload & Compress</h1>
+            <div class="card">
+                <form id="upload-form" enctype="multipart/form-data" class="form-row" aria-label="Upload and compress file">
+                    <label for="file-input">Choose File</label>
+                    <input type="file" id="file-input" name="file" required aria-required="true">
+                    <label for="upload-algorithm">Algorithm</label>
+                    <select id="upload-algorithm" name="algorithm" required aria-required="true">
+                        <option value="rle">Run-Length Encoding (RLE)</option>
+                        <option value="huffman">Huffman Coding</option>
+                        <option value="lzw">LZW</option>
+                        <option value="bwt">Burrows-Wheeler Transform (BWT)</option>
+                        <option value="delta">Delta Encoding</option>
+                        <option value="xor">XOR Encoding</option>
+                        <option value="zip">ZIP (Deflate)</option>
+                        <option value="gzip">GZIP</option>
+                    </select>
+                    <button type="button" id="upload-btn" class="btn">Upload & Compress</button>
+                </form>
+                <div id="upload-progress" class="progress-message"></div>
+            </div>
+        </section>
+        <!-- Manual Actions Page -->
+        <section id="manual" class="page-section" tabindex="0">
+            <h1>Manual Compress/Decompress</h1>
+            <div class="card">
+                <form id="file-action-form" class="form-row" aria-label="Manual compress or decompress">
+                    <label for="filename">Filename</label>
+                    <input type="text" id="filename" name="filename" required placeholder="Without extension" aria-required="true">
+                    <label for="algorithm">Algorithm</label>
+                    <select id="algorithm" name="algorithm" required aria-required="true">
+                        <option value="rle">Run-Length Encoding (RLE)</option>
+                        <option value="huffman">Huffman Coding</option>
+                        <option value="lzw">LZW</option>
+                        <option value="bwt">Burrows-Wheeler Transform (BWT)</option>
+                        <option value="delta">Delta Encoding</option>
+                        <option value="xor">XOR Encoding</option>
+                        <option value="zip">ZIP (Deflate)</option>
+                        <option value="gzip">GZIP</option>
+                    </select>
+                    <div class="btn-group">
+                        <button type="button" id="compress-btn" class="btn">Compress</button>
+                        <button type="button" id="decompress-btn" class="btn">Decompress</button>
+                    </div>
+                </form>
+                <div id="manual-progress" class="progress-message"></div>
+            </div>
+        </section>
+        <!-- Activity Log Page -->
+        <section id="activity" class="page-section" tabindex="0">
+            <h1>Activity Log</h1>
+            <div class="card">
+                <div class="activity-controls">
+                    <input type="text" id="activity-search" placeholder="Search activity..." aria-label="Search activity log">
+                    <select id="activity-filter" aria-label="Filter activity type">
+                        <option value="all">All</option>
+                        <option value="compressed">Compressed</option>
+                        <option value="decompressed">Decompressed</option>
+                        <option value="failed">Failed</option>
+                    </select>
+                </div>
+                <ul id="activity-list" class="activity-list" aria-live="polite"></ul>
+                <div class="pagination">
+                    <button id="prev-page" class="btn" aria-label="Previous page">&lt;</button>
+                    <span id="page-info"></span>
+                    <button id="next-page" class="btn" aria-label="Next page">&gt;</button>
+                </div>
+            </div>
+        </section>
+        <!-- About Page -->
+        <section id="about" class="page-section" tabindex="0">
+            <h1>About</h1>
+            <div class="card">
+                <p>
+                    <strong>Smart File Compression</strong> is a modern, user-friendly system for compressing and decompressing files using advanced algorithms. Designed for efficiency, transparency, and ease of use, it helps you save storage space and manage your files with confidence.
+                </p>
+                <ul>
+                    <li>Multiple compression algorithms</li>
+                    <li>Real-time performance metrics</li>
+                    <li>Accessible, responsive design</li>
+                    <li>Developed with a focus on user experience</li>
+                </ul>
+            </div>
+        </section>
+    </main>
+</body>
+</html>
