@@ -9,6 +9,9 @@ from collections import defaultdict
 import zipfile
 import gzip
 import io
+import bz2
+import lzma
+import zlib
 
 # Function to check disk usage using OS commands
 def check_disk_usage():
@@ -44,32 +47,29 @@ def compress_file(filename, algorithm="rle", source_folder="data", target_folder
             data = f_in.read()
             if algorithm == "rle":
                 compressed = rle_compress(data)
-            elif algorithm == "huffman":
-                compressed = huffman_compress(data)
             elif algorithm == "lzw":
                 compressed = lzw_compress(data)
             elif algorithm == "bwt":
                 compressed = bwt_compress(data)
             elif algorithm == "delta":
                 compressed = delta_compress(data)
-            elif algorithm == "xor":
-                compressed = xor_compress(data)
             elif algorithm == "zip":
                 compressed = zip_compress(filename, data)
             elif algorithm == "gzip":
                 compressed = gzip_compress(data)
+            elif algorithm == "bz2":
+                compressed = bz2.compress(data)
+            elif algorithm == "lzma":
+                compressed = lzma.compress(data)
+            elif algorithm == "zlib":
+                compressed = zlib.compress(data)
             else:
                 return {"error": f"Unknown algorithm: {algorithm}"}
 
-        # If compression is not effective, store original with a flag (except for zip/gzip, which always compress)
-        if algorithm not in ("zip", "gzip") and len(compressed) >= len(data):
-            with open(output_path, 'wb') as f_out:
-                f_out.write(b'UNCOMPRESSED' + data)
-            return {"message": f"File compressed (stored as uncompressed, no gain): {filename} → {filename}.{algorithm}.cmp"}
-        else:
-            with open(output_path, 'wb') as f_out:
-                f_out.write(compressed)
-            return {"message": f"File compressed successfully: {filename} → {filename}.{algorithm}.cmp"}
+        # Always write compressed output, even if not smaller
+        with open(output_path, 'wb') as f_out:
+            f_out.write(compressed)
+        return {"message": f"File compressed successfully: {filename} → {filename}.{algorithm}.cmp"}
 
     except Exception as e:
         return {"error": f"Compression failed: {e}"}
@@ -84,8 +84,8 @@ def decompress_file(filename, algorithm=None, target_folder="decompressed"):
         if os.path.exists(input_path):
             found = True
     else:
-        # Try all algorithms
-        for alg in ["rle", "huffman", "lzw", "bwt", "delta", "xor", "zip", "gzip"]:
+        # Try all algorithms (removed huffman, xor)
+        for alg in ["rle", "lzw", "bwt", "delta", "zip", "gzip", "bz2", "lzma", "zlib"]:
             input_path = os.path.join(data_folder, f"{filename}.{alg}.cmp")
             if os.path.exists(input_path):
                 algorithm = alg
@@ -105,20 +105,22 @@ def decompress_file(filename, algorithm=None, target_folder="decompressed"):
                 decompressed = data[len(b'UNCOMPRESSED'):]
             elif algorithm == "rle":
                 decompressed = rle_decompress(data)
-            elif algorithm == "huffman":
-                decompressed = huffman_decompress(data)
             elif algorithm == "lzw":
                 decompressed = lzw_decompress(data)
             elif algorithm == "bwt":
                 decompressed = bwt_decompress(data)
             elif algorithm == "delta":
                 decompressed = delta_decompress(data)
-            elif algorithm == "xor":
-                decompressed = xor_decompress(data)
             elif algorithm == "zip":
                 decompressed = zip_decompress(filename, data)
             elif algorithm == "gzip":
                 decompressed = gzip_decompress(data)
+            elif algorithm == "bz2":
+                decompressed = bz2.decompress(data)
+            elif algorithm == "lzma":
+                decompressed = lzma.decompress(data)
+            elif algorithm == "zlib":
+                decompressed = zlib.decompress(data)
             else:
                 return {"error": f"Unknown algorithm: {algorithm}"}
 
@@ -149,7 +151,6 @@ def rle_compress(data):
             prev = b
             count = 1
     result.extend([count, prev])
-    # Only return compressed if smaller
     return bytes(result)
 
 def rle_decompress(data):
@@ -160,120 +161,82 @@ def rle_decompress(data):
         result.extend([value] * count)
     return bytes(result)
 
-# --- Huffman Coding ---
-class HuffmanNode:
-    def __init__(self, freq, symbol=None, left=None, right=None):
-        self.freq = freq
-        self.symbol = symbol
-        self.left = left
-        self.right = right
-
-    def __lt__(self, other):
-        return self.freq < other.freq
-
-def huffman_compress(data):
-    if not data:
-        return b''
-    freq = defaultdict(int)
-    for b in data:
-        freq[b] += 1
-    heap = [HuffmanNode(f, s) for s, f in freq.items()]
-    heapq.heapify(heap)
-    if len(heap) == 1:
-        # Only one symbol, no compression possible
-        return b'UNCOMPRESSED' + data
-    while len(heap) > 1:
-        n1 = heapq.heappop(heap)
-        n2 = heapq.heappop(heap)
-        merged = HuffmanNode(n1.freq + n2.freq, left=n1, right=n2)
-        heapq.heappush(heap, merged)
-    root = heap[0]
-    codebook = {}
-    def build_code(node, code=""):
-        if node.symbol is not None:
-            codebook[node.symbol] = code or "0"
-        else:
-            build_code(node.left, code + "0")
-            build_code(node.right, code + "1")
-    build_code(root)
-    def encode_tree(node):
-        if node.symbol is not None:
-            return b'1' + bytes([node.symbol])
-        else:
-            return b'0' + encode_tree(node.left) + encode_tree(node.right)
-    tree_bytes = encode_tree(root)
-    encoded_bits = ''.join(codebook[b] for b in data)
-    padding = (8 - len(encoded_bits) % 8) % 8
-    encoded_bits += '0' * padding
-    encoded_bytes = bytearray()
-    for i in range(0, len(encoded_bits), 8):
-        encoded_bytes.append(int(encoded_bits[i:i+8], 2))
-    return len(tree_bytes).to_bytes(4, 'big') + tree_bytes + bytes([padding]) + bytes(encoded_bytes)
-
-def huffman_decompress(data):
-    if not data:
-        return b''
-    if data.startswith(b'UNCOMPRESSED'):
-        return data[len(b'UNCOMPRESSED'):]
-    tree_len = int.from_bytes(data[:4], 'big')
-    tree_bytes = data[4:4+tree_len]
-    padding = data[4+tree_len]
-    encoded = data[5+tree_len:]
-    def decode_tree(data, idx):
-        if data[idx] == 1:
-            return HuffmanNode(0, data[idx+1]), idx+2
-        else:
-            left, next_idx = decode_tree(data, idx+1)
-            right, next_idx = decode_tree(data, next_idx)
-            return HuffmanNode(0, None, left, right), next_idx
-    root, _ = decode_tree(tree_bytes, 0)
-    bits = ''
-    for b in encoded:
-        bits += f'{b:08b}'
-    if padding:
-        bits = bits[:-padding]
-    result = bytearray()
-    node = root
-    for bit in bits:
-        node = node.left if bit == '0' else node.right
-        if node.symbol is not None:
-            result.append(node.symbol)
-            node = root
-    return bytes(result)
-
 # --- LZW ---
 def lzw_compress(data):
     if not data:
         return b''
+    max_bits = 12
+    max_table_size = 1 << max_bits
+    dictionary = {bytes([i]): i for i in range(256)}
     dict_size = 256
-    dictionary = {bytes([i]): i for i in range(dict_size)}
     w = b""
-    result = []
+    codes = []
     for c in data:
         wc = w + bytes([c])
         if wc in dictionary:
             w = wc
         else:
-            result.append(dictionary[w])
-            dictionary[wc] = dict_size
-            dict_size += 1
+            codes.append(dictionary[w])
+            if dict_size < max_table_size:
+                dictionary[wc] = dict_size
+                dict_size += 1
+            else:
+                # Reset dictionary
+                dictionary = {bytes([i]): i for i in range(256)}
+                dict_size = 256
+                # Avoid redundant entry if wc already in dictionary after reset
+                if wc not in dictionary:
+                    dictionary[wc] = dict_size
+                    dict_size += 1
             w = bytes([c])
     if w:
-        result.append(dictionary[w])
-    # Use 2 bytes per code (max 65535 codes)
+        codes.append(dictionary[w])
+    # Pack codes into a bitstream (12 bits per code)
     out = bytearray()
-    for code in result:
-        out += code.to_bytes(2, 'big')
-    return out
+    buffer = 0
+    bits_in_buffer = 0
+    for code in codes:
+        buffer = (buffer << max_bits) | code
+        bits_in_buffer += max_bits
+        while bits_in_buffer >= 8:
+            bits_in_buffer -= 8
+            out.append((buffer >> bits_in_buffer) & 0xFF)
+        buffer &= (1 << bits_in_buffer) - 1  # Keep only the remaining bits
+    if bits_in_buffer > 0:
+        out.append((buffer << (8 - bits_in_buffer)) & 0xFF)
+    compressed = bytes([max_bits]) + out
+    # Compression ratio logging (optional)
+    ratio = len(compressed) / len(data) if len(data) > 0 else 0
+    # print(f"LZW compression ratio: {ratio:.2f}")
+    if len(compressed) >= len(data):
+        return b'UNCOMPRESSED' + data
+    return compressed
 
 def lzw_decompress(data):
     if not data:
         return b''
     if data.startswith(b'UNCOMPRESSED'):
         return data[len(b'UNCOMPRESSED'):]
+    max_bits = data[0]
+    max_table_size = 1 << max_bits
+    data = data[1:]
+    dictionary = {i: bytes([i]) for i in range(256)}
     dict_size = 256
-    dictionary = {i: bytes([i]) for i in range(dict_size)}
-    codes = [int.from_bytes(data[i:i+2], 'big') for i in range(0, len(data), 2)]
+    codes = []
+    buffer = 0
+    bits_in_buffer = 0
+    idx = 0
+    while idx < len(data):
+        while bits_in_buffer < max_bits and idx < len(data):
+            buffer = (buffer << 8) | data[idx]
+            bits_in_buffer += 8
+            idx += 1
+        if bits_in_buffer < max_bits:
+            break
+        bits_in_buffer -= max_bits
+        code = (buffer >> bits_in_buffer) & ((1 << max_bits) - 1)
+        codes.append(code)
+        buffer &= (1 << bits_in_buffer) - 1
     if not codes:
         return b''
     w = dictionary[codes[0]]
@@ -286,8 +249,15 @@ def lzw_decompress(data):
         else:
             return b''
         result += entry
-        dictionary[dict_size] = w + entry[:1]
-        dict_size += 1
+        if dict_size < max_table_size:
+            dictionary[dict_size] = w + entry[:1]
+            dict_size += 1
+        else:
+            # Reset dictionary
+            dictionary = {i: bytes([i]) for i in range(256)}
+            dict_size = 256
+            dictionary[dict_size] = w + entry[:1]
+            dict_size += 1
         w = entry
     return bytes(result)
 
@@ -349,17 +319,6 @@ def delta_decompress(data):
         result.append((result[-1] + data[i]) % 256)
     return bytes(result)
 
-# --- XOR ---
-def xor_compress(data):
-    key = 0xAA
-    return bytes([b ^ key for b in data])
-
-def xor_decompress(data):
-    key = 0xAA
-    if data.startswith(b'UNCOMPRESSED'):
-        return data[len(b'UNCOMPRESSED'):]
-    return bytes([b ^ key for b in data])
-
 # --- ZIP ---
 def zip_compress(filename, data):
     memfile = io.BytesIO()
@@ -370,7 +329,10 @@ def zip_compress(filename, data):
 def zip_decompress(filename, data):
     memfile = io.BytesIO(data)
     with zipfile.ZipFile(memfile, 'r') as zf:
-        # Extract the first file (should match filename)
+        # Try to extract by original filename first
+        if filename in zf.namelist():
+            return zf.read(filename)
+        # Fallback: extract the first file
         for name in zf.namelist():
             return zf.read(name)
     return b''
@@ -401,6 +363,10 @@ def threaded_compress_file(*args, **kwargs):
 
 # ----------------------------------------------------------
 
+def log_activity(message):
+    with open("activity.log", "a") as log_file:
+        log_file.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} - {message}\n")
+
 def get_file_metadata(filename):
     file_path = os.path.join('data', filename)
     if os.path.exists(file_path):
@@ -414,6 +380,9 @@ def get_file_metadata(filename):
         return {"error": "File not found"}
 
 def get_storage_metrics():
+    # Ensure 'data' directory exists
+    if not os.path.exists("data"):
+        os.makedirs("data", exist_ok=True)
     total, used, free = shutil.disk_usage("data")
     return {
         "total_space": f"{total // (1024 ** 3)} GB",
@@ -481,7 +450,3 @@ def calculate_performance_metrics():
         "total_files_compressed": total_files_compressed,
         "total_files_decompressed": total_files_decompressed,
     }
-
-def log_activity(message):
-    with open("activity.log", "a") as log_file:
-        log_file.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} - {message}\n")
