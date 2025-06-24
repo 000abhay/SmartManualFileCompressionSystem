@@ -58,14 +58,9 @@
                     <input type="file" id="file-input" name="file" required aria-required="true">
                     <label for="upload-algorithm">Algorithm</label>
                     <select id="upload-algorithm" name="algorithm" required aria-required="true">
-                        <option value="rle">Run-Length Encoding (RLE)</option>
-                        <option value="huffman">Huffman Coding</option>
-                        <option value="lzw">LZW</option>
-                        <option value="bwt">Burrows-Wheeler Transform (BWT)</option>
-                        <option value="delta">Delta Encoding</option>
-                        <option value="xor">XOR Encoding</option>
-                        <option value="zip">ZIP (Deflate)</option>
-                        <option value="gzip">GZIP</option>
+                        {% for alg in algorithms %}
+                            <option value="{{ alg }}">{{ alg|upper }}</option>
+                        {% endfor %}
                     </select>
                     <button type="button" id="upload-btn" class="btn">Upload & Compress</button>
                 </form>
@@ -81,14 +76,9 @@
                     <input type="text" id="filename" name="filename" required placeholder="Without extension" aria-required="true">
                     <label for="algorithm">Algorithm</label>
                     <select id="algorithm" name="algorithm" required aria-required="true">
-                        <option value="rle">Run-Length Encoding (RLE)</option>
-                        <option value="huffman">Huffman Coding</option>
-                        <option value="lzw">LZW</option>
-                        <option value="bwt">Burrows-Wheeler Transform (BWT)</option>
-                        <option value="delta">Delta Encoding</option>
-                        <option value="xor">XOR Encoding</option>
-                        <option value="zip">ZIP (Deflate)</option>
-                        <option value="gzip">GZIP</option>
+                        {% for alg in algorithms %}
+                            <option value="{{ alg }}">{{ alg|upper }}</option>
+                        {% endfor %}
                     </select>
                     <div class="btn-group">
                         <button type="button" id="compress-btn" class="btn">Compress</button>
