@@ -51,11 +51,17 @@ def index():
     disk_usage = check_disk_usage()
     storage_metrics = get_storage_metrics()
     performance_metrics = calculate_performance_metrics()
+    # List of available algorithms for the frontend (removed huffman, xor)
+    algorithms = [
+        "rle", "lzw", "bwt", "delta",
+        "zip", "gzip", "bz2", "lzma", "zlib"
+    ]
     return render_template(
         'index.html',
         disk_usage=disk_usage,
         storage_metrics=storage_metrics,
         performance_metrics=performance_metrics,
+        algorithms=algorithms
     )
 
 # API Route to upload and compress a file
